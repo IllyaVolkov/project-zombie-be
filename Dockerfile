@@ -19,7 +19,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app/
 WORKDIR /app
-RUN python manage.py collectstatic --no-input
 
 EXPOSE 8000
 
