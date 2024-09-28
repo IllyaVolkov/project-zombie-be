@@ -24,7 +24,9 @@ class Survivor(BaseModel):
 class LocationLog(BaseModel):
     latitude = models.FloatField()
     longitude = models.FloatField()
-    survivor = models.ForeignKey(Survivor, on_delete=models.CASCADE)
+    survivor = models.ForeignKey(
+        Survivor, on_delete=models.CASCADE, related_name="location_logs"
+    )
 
 
 class InfectionReport(BaseModel):
