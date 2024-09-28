@@ -10,3 +10,9 @@ To access django admin, create superuser:
 ```bash
 python manage.py createsuperuser
 ```
+
+To run django tests (DATABASE_URL env must be set):
+
+```bash
+python manage.py test
+```

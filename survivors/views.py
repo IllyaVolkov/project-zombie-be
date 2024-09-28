@@ -97,10 +97,9 @@ class TradeAPIView(GenericAPIView):
             data={"survivor_id": kwargs["pk"], **request.data}
         )
         serializer.is_valid(raise_exception=True)
-        trade_data = serializer.validated_data
 
-        survivor = Survivor.objects.get(id=trade_data["survivor_id"])
-        partner = Survivor.objects.get(id=trade_data["partner_id"])
+        survivor = serializer.validated_data["survivor_id"]
+        partner = serializer.validated_data["partner_id"]
 
         resources = Resource.objects.values("name", "id")
         resource_id_map = {r["name"]: r["id"] for r in resources}
@@ -116,8 +115,8 @@ class TradeAPIView(GenericAPIView):
         inventory_items_bulk_update_list = []
         inventory_items_bulk_delete_list = []
 
-        for item in trade_data["offered_items"]:
-            survivor_item_obj = survivor_items[item["name"]]
+        for item in serializer.validated_data["offered_items"]:
+            survivor_item_obj = survivor_items[item["resource"].name]
 
             if survivor_item_obj.quantity > item["quantity"]:
                 survivor_item_obj.quantity -= item["quantity"]
@@ -125,7 +124,7 @@ class TradeAPIView(GenericAPIView):
             else:
                 inventory_items_bulk_delete_list.append(survivor_item_obj)
 
-            partner_item_obj = survivor_items.get(item["name"])
+            partner_item_obj = partner_items.get(item["resource"].name)
             if partner_item_obj:
                 partner_item_obj.quantity += item["quantity"]
                 inventory_items_bulk_update_list.append(partner_item_obj)
@@ -133,15 +132,15 @@ class TradeAPIView(GenericAPIView):
                 inventory_items_bulk_create_list.append(
                     InventoryItem(
                         owner=partner,
-                        resource_id=resource_id_map[item["name"]],
+                        resource_id=resource_id_map[item["resource"].name],
                         quantity=item["quantity"],
                     )
                 )
 
-        for item in trade_data["requested_items"]:
-            survivor_item_obj = survivor_items.get(item["name"])
+        for item in serializer.validated_data["requested_items"]:
+            survivor_item_obj = survivor_items.get(item["resource"].name)
             if survivor_item_obj:
-                survivor_item_obj = survivor_items[item["name"]]
+                survivor_item_obj = survivor_items[item["resource"].name]
                 survivor_item_obj.quantity += item["quantity"]
                 if survivor_item_obj not in inventory_items_bulk_update_list:
                     inventory_items_bulk_update_list.append(survivor_item_obj)
@@ -149,12 +148,12 @@ class TradeAPIView(GenericAPIView):
                 inventory_items_bulk_create_list.append(
                     InventoryItem(
                         owner=survivor,
-                        resource_id=resource_id_map[item["name"]],
+                        resource_id=resource_id_map[item["resource"].name],
                         quantity=item["quantity"],
                     )
                 )
 
-            partner_item_obj = partner_items[item["name"]]
+            partner_item_obj = partner_items[item["resource"].name]
             if partner_item_obj.quantity > item["quantity"]:
                 partner_item_obj.quantity -= item["quantity"]
                 if partner_item_obj not in inventory_items_bulk_update_list:

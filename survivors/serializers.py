@@ -11,9 +11,8 @@ from .models import (
 from resources.models import Resource
 
 
-def validate_survivor_not_infected(value):
-    survivor = Survivor.objects.get(id=value)
-    if survivor.is_infected:
+def validate_survivor_not_infected(self, value):
+    if value.is_infected:
         raise serializers.ValidationError(
             ["Infected survivors cannot perform such action."]
         )
@@ -30,7 +29,7 @@ class LocationLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = LocationLog
         fields = ["id", "latitude", "longitude", "created_at"]
-        read_only_fields = ["created_at", "updated_at"]
+        read_only_fields = ["created_at"]
 
 
 class InventoryItemSerializer(serializers.ModelSerializer):
@@ -39,7 +38,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         max_digits=5, decimal_places=2, source="resource.price", read_only=True
     )
     resource_id = serializers.PrimaryKeyRelatedField(
-        queryset=Resource.objects.all(), write_only=True
+        source="resource", queryset=Resource.objects.all(), write_only=True
     )
 
     class Meta:
@@ -51,9 +50,9 @@ class InventoryItemSerializer(serializers.ModelSerializer):
 class SurvivorSerializer(serializers.ModelSerializer):
     gender = serializers.CharField(source="gender.name", read_only=True)
     gender_id = serializers.PrimaryKeyRelatedField(
-        queryset=Gender.objects.all(), write_only=True
+        source="gender", queryset=Gender.objects.all(), write_only=True
     )
-    resources = InventoryItemSerializer(many=True, write_only=True)
+    inventory_items = InventoryItemSerializer(many=True, write_only=True)
 
     class Meta:
         model = Survivor
@@ -63,18 +62,17 @@ class SurvivorSerializer(serializers.ModelSerializer):
             "age",
             "gender",
             "gender_id",
-            "resources",
+            "inventory_items",
             "is_infected",
         ]
-        read_only_fields = ["created_at", "updated_at"]
+        read_only_fields = ["id", "is_infected"]
 
     @transaction.atomic
     def create(self, validated_data):
-        resources = validated_data.pop("resources")
+        inventory_items_data = validated_data.pop("inventory_items")
         instance = Survivor.objects.create(**validated_data)
         inventory_items = [
-            InventoryItem(survivor=instance, **resource_data)
-            for resource_data in resources
+            InventoryItem(owner=instance, **item) for item in inventory_items_data
         ]
         InventoryItem.objects.bulk_create(inventory_items)
         return instance
@@ -83,21 +81,21 @@ class SurvivorSerializer(serializers.ModelSerializer):
 class SurvivorLocationLogSerializer(LocationLogSerializer):
     survivor = SurvivorSerializer(read_only=True)
     survivor_id = serializers.PrimaryKeyRelatedField(
-        queryset=Survivor.objects.all(), write_only=True
+        source="survivor", queryset=Survivor.objects.all(), write_only=True
     )
 
     validate_survivor_id = validate_survivor_not_infected
 
     class Meta(LocationLogSerializer.Meta):
-        fields = [*LocationLogSerializer.Meta.fields, "survivor"]
+        fields = [*LocationLogSerializer.Meta.fields, "survivor", "survivor_id"]
 
 
 class InfectionReportSerializer(serializers.ModelSerializer):
     author_id = serializers.PrimaryKeyRelatedField(
-        queryset=Survivor.objects.all(), write_only=True
+        source="author", queryset=Survivor.objects.all(), write_only=True
     )
     infected_survivor_id = serializers.PrimaryKeyRelatedField(
-        queryset=Survivor.objects.all(), write_only=True
+        source="infected_survivor", queryset=Survivor.objects.all(), write_only=True
     )
 
     validate_author_id = validate_survivor_not_infected
@@ -107,11 +105,11 @@ class InfectionReportSerializer(serializers.ModelSerializer):
         fields = ["author_id", "infected_survivor_id"]
 
     def validate(self, attrs):
-        author_id = attrs.get("author_id")
-        infected_survivor_id = attrs.get("infected_survivor_id")
+        author = attrs.get("author")
+        infected_survivor = attrs.get("infected_survivor")
 
         if InfectionReport.objects.filter(
-            author_id=author_id, infected_survivor_id=infected_survivor_id
+            author=author, infected_survivor=infected_survivor
         ).exists():
             raise serializers.ValidationError(
                 {"infected_survivor_id": ["You cannot report same survivor twice!"]}
@@ -122,7 +120,7 @@ class InfectionReportSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         instance = super().create(validated_data)
         potentially_infected_survivor = instance.infected_survivor
-        if potentially_infected_survivor.infection_reports.count >= 3:
+        if potentially_infected_survivor.infection_reports.count() >= 3:
             potentially_infected_survivor.is_infected = True
             potentially_infected_survivor.save()
         return instance
@@ -146,7 +144,7 @@ class TradeSerializer(serializers.Serializer):
 
         for item in value:
             if not survivor.inventory_items.filter(
-                resource__name=item["name"], quantity__lte=item["quantity"]
+                resource__name=item["resource"].name, quantity__gte=item["quantity"]
             ).exists():
                 raise serializers.ValidationError(
                     {
@@ -162,7 +160,7 @@ class TradeSerializer(serializers.Serializer):
 
         for item in value:
             if not partner.inventory_items.filter(
-                resource__name=item["name"], quantity__lte=item["quantity"]
+                resource__name=item["resource"].name, quantity__gte=item["quantity"]
             ).exists():
                 raise serializers.ValidationError(
                     {
@@ -179,14 +177,14 @@ class TradeSerializer(serializers.Serializer):
 
         offered_value = sum(
             [
-                resource_price_map[item["name"]] * item["quantity"]
+                resource_price_map[item["resource"].name] * item["quantity"]
                 for item in attrs["offered_items"]
             ]
         )
         requested_value = sum(
             [
-                resource_price_map[item["name"]] * item["quantity"]
-                for item in attrs["offered_items"]
+                resource_price_map[item["resource"].name] * item["quantity"]
+                for item in attrs["requested_items"]
             ]
         )
         if offered_value != requested_value:
