@@ -60,7 +60,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CORS_ORIGIN_WHITELIST = ["http://localhost:4200", "http://localhost:8000"]
+CORS_ORIGIN_WHITELIST = ["http://localhost:3000", "http://localhost:8000"]
 
 ROOT_URLCONF = "project_zombie.urls"
 
