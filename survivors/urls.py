@@ -12,17 +12,17 @@ from .views import (
 
 survivor_details_urlpatterns = [
     path(
-        "inventory-items",
+        "inventory-items/",
         SurvivorInventoryListAPIView.as_view(),
         name="survivor-inventory",
     ),
     path(
-        "location-logs",
+        "location-logs/",
         SurvivorLocationLogsCreateAPIView.as_view(),
         name="survivor-location-logs",
     ),
     path(
-        "infection-reports",
+        "infection-reports/",
         SurvivorInfectionReportsCreateAPIView.as_view(),
         name="survivor-infection-reports",
     ),
