@@ -112,7 +112,7 @@ class InfectionReportSerializer(serializers.ModelSerializer):
             author=author, infected_survivor=infected_survivor
         ).exists():
             raise serializers.ValidationError(
-                {"infected_survivor_id": ["You cannot report same survivor twice!"]}
+                {"author_id": ["You cannot report same survivor twice!"]}
             )
         return super().validate(attrs)
 
