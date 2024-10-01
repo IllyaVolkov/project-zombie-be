@@ -137,7 +137,15 @@ class TradeSerializer(serializers.Serializer):
     requested_items = InventoryItemSerializer(many=True, write_only=True)
 
     validate_survivor_id = validate_survivor_not_infected
-    validate_partner_id = validate_survivor_not_infected
+
+    def validate_partner_id(self, value):
+        value = validate_survivor_not_infected(self, value)
+        survivor = Survivor.objects.get(id=self.initial_data["survivor_id"])
+        if survivor == value:
+            raise serializers.ValidationError(
+                ["You can't trade with yourself!"]
+            )
+        return value
 
     def validate_offered_items(self, value):
         survivor = Survivor.objects.get(id=self.initial_data["survivor_id"])
@@ -147,11 +155,7 @@ class TradeSerializer(serializers.Serializer):
                 resource__name=item["resource"].name, quantity__gte=item["quantity"]
             ).exists():
                 raise serializers.ValidationError(
-                    {
-                        "offered_items": [
-                            "Some offered items are missing from survivor's inventory."
-                        ]
-                    }
+                    ["Some offered items are missing from survivor's inventory."]
                 )
         return value
 
@@ -163,11 +167,7 @@ class TradeSerializer(serializers.Serializer):
                 resource__name=item["resource"].name, quantity__gte=item["quantity"]
             ).exists():
                 raise serializers.ValidationError(
-                    {
-                        "requested_items": [
-                            "Some requested items are missing from partner's inventory."
-                        ]
-                    }
+                    ["Some requested items are missing from partner's inventory."]
                 )
         return value
 

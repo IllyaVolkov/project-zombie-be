@@ -26,7 +26,7 @@ survivor_details_urlpatterns = [
         SurvivorInfectionReportsCreateAPIView.as_view(),
         name="survivor-infection-reports",
     ),
-    path("trade", TradeAPIView.as_view(), name="trade"),
+    path("trade/", TradeAPIView.as_view(), name="trade"),
 ]
 
 

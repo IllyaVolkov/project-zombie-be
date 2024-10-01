@@ -352,6 +352,43 @@ class TradeAPIViewTestCase(APITestCase):
             ).count(),
         )
 
+    def test_post_equal_exchange(self):
+        data = {
+            "partner_id": self.partner.id,
+            "offered_items": [
+                {
+                    "resource_id": r.id,
+                    "quantity": 2,
+                }
+                for r in self.resources[:5]
+            ],
+            "requested_items": [
+                {
+                    "resource_id": r.id,
+                    "quantity": 2,
+                }
+                for r in self.resources[:5]
+            ],
+        }
+
+        res = self.client.post(
+            self.url, json.dumps(data), content_type="application/json"
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        self.assertEqual(
+            5,
+            InventoryItem.objects.filter(
+                owner=self.survivor, resource__in=self.resources[:5], quantity=4
+            ).count(),
+        )
+        self.assertEqual(
+            10,
+            InventoryItem.objects.filter(
+                owner=self.partner, resource__in=self.resources[:10], quantity=2
+            ).count(),
+        )
+
     def test_post_missing_resources(self):
         data = {
             "partner_id": self.partner.id,
